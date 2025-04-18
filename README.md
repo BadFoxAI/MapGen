@@ -1,5 +1,7 @@
 # Interactive 2D Terrain Generator
 
+View App: [https://terraingen.netlify.app/]([https://duckduckgo.com](https://terraingen.netlify.app/)).
+
 This is a simple, interactive 2D terrain generator built with HTML, CSS, and JavaScript. It uses Perlin noise and Fractional Brownian Motion (FBM) to create tile-based terrain maps that can be explored and customized in real-time.
 
 ## Features
@@ -17,8 +19,8 @@ This is a simple, interactive 2D terrain generator built with HTML, CSS, and Jav
 
 ## How to Use
 
-1.  **Download:** Clone this repository or download the `terrain_generator.html` file.
-2.  **Open:** Open the `terrain_generator.html` file directly in your web browser (Chrome, Firefox, Edge, Safari recommended).
+1.  **Download:** Clone this repository or download the `index.html` file.
+2.  **Open:** Open the `index.html` file directly in your web browser (Chrome, Firefox, Edge, Safari recommended).
 3.  **Interact:**
     *   **Pan:** Click and drag the terrain map with the mouse, or use the `W`, `A`, `S`, `D` or Arrow keys.
     *   **Customize:** Use the controls in the sidebar on the left to change parameters like tile size, noise settings, and sea level. The terrain will update automatically.
