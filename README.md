@@ -63,4 +63,4 @@ This is a simple, interactive 2D terrain generator built with HTML, CSS, and Jav
 
 ## License
 
-This project is open source. Feel free to use, modify, and distribute it. (Consider adding a specific license like MIT if desired).
+This project is open source. Feel free to use, modify, and distribute it.
