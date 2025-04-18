@@ -1,847 +1,796 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Optimized Terrain Generator</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            background-color: #222;
-            touch-action: none;
-            user-select: none;
-        }
-        #heightmap {
-            position: absolute;
-            top: 0;
-            left: 0;
-            /* width/height determined by grid */
-            display: grid;
-             /* Allow panning via top/left */
-            will-change: transform;
-        }
-        .tile {
-            transition: background-color 0.15s ease-out;
-            box-sizing: border-box;
-            /* border: 1px solid rgba(255,255,255,0.05); */ /* Optional: visualize tiles */
-        }
-        #controls {
-            position: fixed;
-            top: 8px;
-            left: 8px;
-            background-color: rgba(30, 30, 30, 0.92);
-            padding: 10px 12px;
-            border-radius: 5px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.6);
-            width: 280px;
-            max-height: calc(94vh - 30px);
-            overflow-y: auto;
-            z-index: 100;
-            color: #eee;
-            font-size: 13px;
-            transition: transform 0.3s ease-in-out, margin-left 0.3s ease-in-out;
-        }
-        #controls.collapsed {
-            transform: translateX(-100%);
-            margin-left: -15px;
-            box-shadow: none;
-        }
-        #toggle-controls {
-            position: fixed;
-            top: 8px;
-            left: calc(8px + 280px + 12px + 8px);
-            z-index: 101;
-            background-color: #4a6b3e;
-            color: white;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 0 4px 4px 0;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            transition: left 0.3s ease-in-out, background-color 0.15s;
-        }
-        #toggle-controls:hover {
-            background-color: #5a7c4e;
-        }
-        #controls.collapsed + #toggle-controls {
-             left: 8px;
-             border-radius: 4px;
-        }
-        .control-group {
-            margin-bottom: 8px;
-        }
-        label {
-            display: block;
-            margin-bottom: 2px;
-            font-weight: bold;
-            color: #ddd;
-        }
-        input[type="range"] {
-            width: 100%;
-            height: 16px;
-            background: #444;
-            margin: 4px 0;
-        }
-        input[type="color"] {
-            width: 28px;
-            height: 20px;
-            padding: 0 1px;
-            border: 1px solid #555;
-            vertical-align: middle;
-        }
-        select, button#regenerate {
-            width: 100%;
-            padding: 6px;
-            margin: 6px 0;
-            background: #444;
-            color: white;
-            border: 1px solid #555;
-            border-radius: 3px;
-            font-size: 13px;
-        }
-        button#regenerate {
-            background-color: #4a6b3e;
-            border: none;
-            padding: 8px;
-            cursor: pointer;
-            transition: background-color 0.15s;
-        }
-        button#regenerate:hover {
-            background-color: #5a7c4e;
-        }
-        .value-display {
-            font-size: 11px;
-            color: #aaa;
-            text-align: right;
-            margin-top: -2px;
-        }
-        .color-preview {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 1px solid #555;
-            margin-right: 6px;
-            vertical-align: middle;
-            border-radius: 2px;
-        }
-        .section-title {
-            font-weight: bold;
-            margin: 12px 0 6px 0;
-            padding-bottom: 3px;
-            border-bottom: 1px solid #444;
-            color: #ddd;
-            font-size: 13px;
-        }
-        #position-display {
-            position: fixed;
-            bottom: 8px;
-            right: 8px;
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-family: monospace;
-            z-index: 99;
-        }
-        #help-text {
-            position: fixed;
-            bottom: 8px;
-            left: 310px; /* Initial position next to controls */
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            max-width: 200px;
-            line-height: 1.4;
-            transition: left 0.3s ease-in-out;
-            z-index: 99; /* Below controls */
-        }
-         #controls.collapsed ~ #help-text {
-             left: 8px; /* Move help text to edge when controls collapsed */
-        }
-        .compact-row {
-            display: flex;
-            gap: 10px;
-        }
-        .compact-row > div {
-            flex: 1;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Terrain Generator</title>
+  <style>
+    :root { --sidebar-width: 260px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0; overflow: hidden;
+      background: #222; color: #ddd;
+      font: 13px Arial, sans-serif;
+    }
+    #terrainCanvas {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: block; /* Prevents potential small gaps */
+    }
+    #sidebar {
+      position: fixed; top: 0; left: 0;
+      width: var(--sidebar-width);
+      height: 100%; /* Ensure full height */
+      transition: width 0.3s ease;
+      overflow: hidden;
+      background: rgba(20,20,20,0.95);
+      box-shadow: 2px 0 6px rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    #sidebar.collapsed {
+      width: 40px; /* only toggle visible */
+    }
+    #sidebar .toggle-btn {
+      position: absolute; top: 12px; right: 12px;
+      width: 28px; /* Adjusted size */
+      height: 28px; /* Adjusted size */
+      background: #4a6b3e; color: #fff;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0; /* Remove default padding */
+      line-height: 1; /* Ensure icon is centered vertically */
+      z-index: 110; /* Ensure toggle is above controls */
+    }
+    /* Adjust toggle position when collapsed */
+    #sidebar.collapsed .toggle-btn {
+        right: 6px; /* Center within the 40px width */
+    }
+    #controls {
+      opacity: 1;
+      transition: opacity 0.3s ease;
+      padding: 60px 12px 12px;
+      overflow-y: auto; height: 100%; /* Ensure scrollability */
+    }
+    #sidebar.collapsed #controls {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #controls h2 {
+      margin: 0 0 16px; font-size: 16px; text-align: center;
+      color: #eee;
+    }
+    label {
+      display: block; margin: 8px 0; font-size: 13px;
+    }
+    select, input[type=range], input[type=color], button {
+      width: 100%; margin-top: 4px;
+      background: #333; border: 1px solid #555; border-radius: 4px;
+      color: #eee; font-size: 13px; padding: 4px;
+    }
+    input[type=range] { height: 18px; padding: 0; /* Remove default padding */ }
+    input[type=color] { width: 32px; height: 26px; padding: 1px; }
+    .value { font-size: 11px; color: #aaa; text-align: right; margin-top: -4px; }
+    .row { display: flex; gap: 8px; }
+    .row > div { flex: 1; }
+    .checkbox { display: flex; align-items: center; gap: 6px; margin: 8px 0; }
+    /* Ensure checkbox label is clickable */
+    .checkbox label { margin: 0; }
+    #help, #coords { font: 11px monospace; text-align: center; margin: 8px 0; }
+    #regenerate {
+      margin-top: 12px; background: #4a6b3e;
+      border: none; padding: 8px; cursor: pointer;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-    <div id="heightmap"></div>
-
+  <canvas id="terrainCanvas"></canvas>
+  <div id="sidebar">
+    <button class="toggle-btn" id="toggleBtn" aria-label="Toggle menu">⮜</button>
     <div id="controls">
-        <select id="preset-select">
-            <option value="bw">B/W Perlin</option>
-            <option value="terrain">Basic Terrain</option>
-            <option value="atlas" selected>Advanced Atlas</option>
-            <option value="realistic">Realistic Earth</option>
-            <option value="mars">Mars</option>
-            <option value="islands">Islands</option>
+      <h2>Settings</h2>
+      <label for="preset">Preset:
+        <select id="preset">
+          <option value="bw">Black & White</option>
+          <option value="earth">Earth Classic</option>
+          <option value="mars">Mars</option>
+          <option value="islands">Islands</option>
+          <option value="snowyTundra">Snowy Tundra</option>
+          <option value="volcanic">Volcanic</option>
+          <option value="alienWorld">Alien World</option>
+          <option value="cybergrid">Cybergrid</option>
         </select>
-
-        <div class="section-title">VIEW</div>
-        <!-- Removed Zoom Control -->
-        <div class="control-group"> <!-- Changed layout as zoom is removed -->
-            <label for="gridDensity">Tile Size</label>
-            <input type="range" id="gridDensity" min="10" max="60" value="30">
-            <div class="value-display"><span id="gridDensityValue">30</span>px</div>
+      </label>
+      <label for="tileSize">Tile Size (px)
+        <input type="range" id="tileSize" min="3" max="60" step="1" value="15"
+               aria-label="Tile Size" title="Tile size in pixels (3–60)">
+        <div class="value" id="tileSizeVal">15px</div>
+      </label>
+      <div class="row">
+        <div>
+          <label for="heightScale">Height Scale
+            <input type="range" id="heightScale" min="0.5" max="2.0" step="0.1" value="1.0"
+                   aria-label="Height Scale" title="Height multiplier (0.5–2)">
+            <div class="value" id="heightScaleVal">1.0×</div>
+          </label>
         </div>
-
-        <div class="section-title">TERRAIN</div>
-        <div class="compact-row">
-            <div class="control-group">
-                <label for="heightRange">Height Scale</label> <!-- Renamed label for clarity -->
-                <input type="range" id="heightRange" min="0.5" max="2.0" step="0.1" value="1.0"> <!-- Changed range/step for scale -->
-                <div class="value-display"><span id="heightRangeValue">1.0</span>x</div>
-            </div>
-            <div class="control-group">
-                <label for="seaLevel">Sea Level</label>
-                <input type="range" id="seaLevel" min="0.1" max="0.7" step="0.01" value="0.35">
-                <div class="value-display"><span id="seaLevelValue">0.35</span></div>
-            </div>
+        <div>
+          <label for="seaLevel">Sea Level
+            <input type="range" id="seaLevel" min="0.1" max="0.7" step="0.01" value="0.35"
+                   aria-label="Sea Level" title="Sea level threshold (0.1–0.7)">
+            <div class="value" id="seaLevelVal">0.35</div>
+          </label>
         </div>
-
-        <div class="section-title">NOISE</div>
-        <div class="compact-row">
-            <div class="control-group">
-                <label for="noiseScale">Scale</label>
-                <input type="range" id="noiseScale" min="20" max="500" value="150">
-                <div class="value-display"><span id="noiseScaleValue">150</span></div>
-            </div>
-            <div class="control-group">
-                <label for="octaves">Octaves</label>
-                <input type="range" id="octaves" min="1" max="8" value="4">
-                <div class="value-display"><span id="octavesValue">4</span></div>
-            </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="noiseScale">Noise Scale
+            <input type="range" id="noiseScale" min="20" max="500" step="1" value="150"
+                   aria-label="Noise Scale" title="Noise feature size (20–500)">
+            <div class="value" id="noiseScaleVal">150</div>
+          </label>
         </div>
-        <div class="compact-row">
-            <div class="control-group">
-                <label for="persistence">Persistence</label>
-                <input type="range" id="persistence" min="0.1" max="0.9" step="0.05" value="0.6">
-                <div class="value-display"><span id="persistenceValue">0.60</span></div>
-            </div>
-            <div class="control-group">
-                <label for="lacunarity">Lacunarity</label>
-                <input type="range" id="lacunarity" min="1.1" max="4" step="0.1" value="2">
-                <div class="value-display"><span id="lacunarityValue">2.0</span></div>
-            </div>
+        <div>
+          <label for="octaves">Octaves
+            <input type="range" id="octaves" min="1" max="8" step="1" value="4"
+                   aria-label="Octaves" title="Number of octaves (1–8)">
+            <div class="value" id="octavesVal">4</div>
+          </label>
         </div>
-
-        <div class="section-title">COLORS</div>
-        <div class="compact-row">
-            <div class="control-group">
-                <label><span class="color-preview" id="previewDeepWater" style="background: #0f2c4a;"></span>Deep</label>
-                <input type="color" id="colorDeepWater" value="#0f2c4a">
-            </div>
-            <div class="control-group">
-                <label><span class="color-preview" id="previewShallowWater" style="background: #1a4a7a;"></span>Shallow</label>
-                <input type="color" id="colorShallowWater" value="#1a4a7a">
-            </div>
-            <div class="control-group">
-                <label><span class="color-preview" id="previewSand" style="background: #e8d5a8;"></span>Sand</label>
-                <input type="color" id="colorSand" value="#e8d5a8">
-            </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="persistence">Persistence
+            <input type="range" id="persistence" min="0.1" max="0.9" step="0.05" value="0.6"
+                   aria-label="Persistence" title="Amplitude falloff (0.1–0.9)">
+            <div class="value" id="persistenceVal">0.60</div>
+          </label>
         </div>
-        <div class="compact-row">
-            <div class="control-group">
-                <label><span class="color-preview" id="previewGrass" style="background: #6b8c42;"></span>Grass</label>
-                <input type="color" id="colorGrass" value="#6b8c42">
-            </div>
-            <div class="control-group">
-                <label><span class="color-preview" id="previewForest" style="background: #3a5a2a;"></span>Forest</label>
-                <input type="color" id="colorForest" value="#3a5a2a">
-            </div>
-            <div class="control-group">
-                <label><span class="color-preview" id="previewRock" style="background: #6a5a4a;"></span>Rock</label>
-                <input type="color" id="colorRock" value="#6a5a4a">
-            </div>
+        <div>
+          <label for="lacunarity">Lacunarity
+            <input type="range" id="lacunarity" min="1.1" max="4.0" step="0.1" value="2.0"
+                   aria-label="Lacunarity" title="Frequency jump per octave (1.1–4)">
+            <div class="value" id="lacunarityVal">2.0</div>
+          </label>
         </div>
-         <div class="compact-row">
-             <div class="control-group">
-                <label><span class="color-preview" id="previewSnow" style="background: #d0e0f0;"></span>Snow</label>
-                <input type="color" id="colorSnow" value="#d0e0f0">
-            </div>
-            <div></div><!-- Spacer -->
-            <div></div><!-- Spacer -->
-         </div>
-
-        <button id="regenerate">Generate New Seed</button>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="showGrid" aria-label="Show Grid Lines" title="Toggle grid lines">
+        <label for="showGrid">Show Grid Lines</label>
+      </div>
+      <div id="help">Arrows/WASD to pan | R: New seed</div>
+      <div id="coords">X: 0, Y: 0</div>
+      <button id="regenerate">Generate New Seed</button>
     </div>
+  </div>
+  <script>
+    /**
+     * Implements the Perlin noise algorithm for 2D noise generation.
+     * Based on Ken Perlin's improved noise algorithm.
+     */
+    class Perlin {
+      /**
+       * Creates a new Perlin noise generator.
+       * @param {number} [seed=Date.now()] - The seed for the pseudo-random number generator.
+       */
+      constructor(seed = Date.now()) {
+        this.s = seed; // Store the seed
+        this.g = new Map(); // Cache for gradient vectors to avoid recalculation
+      }
 
-    <button id="toggle-controls" title="Toggle Controls Panel (C)">◀</button>
+      /**
+       * Internal pseudo-random number generator (PRNG).
+       * Uses a simple XORShift algorithm variant.
+       * @returns {number} A pseudo-random number between 0 (inclusive) and 1 (exclusive).
+       * @private
+       */
+      _rand() {
+        // XORShift algorithm steps
+        this.s ^= this.s >> 12;
+        this.s ^= this.s << 25;
+        this.s ^= this.s >> 27;
+        // Return a normalized value between 0 and 1
+        // Using large prime multiplier and division by 2^64 for better distribution
+        return ((this.s * 0x2545F4914F6CDD1D) / (2**64)) + 0.5;
+      }
 
-    <div id="position-display">X: 0, Y: 0</div> <!-- Removed Zoom -->
-    <div id="help-text">Arrows/WASD: Pan<br>R: New Seed<br>C: Toggle Controls<br>Drag: Pan</div> <!-- Removed Zoom Help -->
-
-    <script>
-        // Optimized Perlin noise generator (remains the same)
-        class PerlinNoise {
-             constructor(seed) {
-                this.seed = seed || Math.random() * 999999;
-                this.gradients = new Map();
-                this._s = this.seed; // Use separate state for PRNG
-            }
-
-             _random() {
-                this._s ^= this._s >> 12;
-                this._s ^= this._s << 25;
-                this._s ^= this._s >> 27;
-                // Multiply by a large prime number and take the lower 53 bits for a float
-                return (this._s * 0x2545F4914F6CDD1D) / Math.pow(2, 64) + 0.5; // Ensure positive float 0..1
-            }
-
-            getGradient(x, y) {
-                const key = `${x}|${y}`;
-                if (!this.gradients.has(key)) {
-                    const angle = this._random() * Math.PI * 2;
-                    this.gradients.set(key, [Math.cos(angle), Math.sin(angle)]);
-                }
-                return this.gradients.get(key);
-            }
-
-            get(x, y) {
-                const x0 = Math.floor(x), y0 = Math.floor(y);
-                const x1 = x0 + 1, y1 = y0 + 1;
-
-                const g00 = this.getGradient(x0, y0);
-                const g10 = this.getGradient(x1, y0);
-                const g01 = this.getGradient(x0, y1);
-                const g11 = this.getGradient(x1, y1);
-
-                const d00 = [x - x0, y - y0];
-                const d10 = [x - x1, y - y0];
-                const d01 = [x - x0, y - y1];
-                const d11 = [x - x1, y - y1];
-
-                const p00 = d00[0] * g00[0] + d00[1] * g00[1];
-                const p10 = d10[0] * g10[0] + d10[1] * g10[1];
-                const p01 = d01[0] * g01[0] + d01[1] * g01[1];
-                const p11 = d11[0] * g11[0] + d11[1] * g11[1];
-
-                const sx = x - x0;
-                const sy = y - y0;
-                const u = sx * sx * sx * (sx * (sx * 6 - 15) + 10);
-                const v = sy * sy * sy * (sy * (sy * 6 - 15) + 10);
-
-                // Clamp interpolation factor just in case
-                const lerpVal = this._lerp(
-                    this._lerp(p00, p10, u),
-                    this._lerp(p01, p11, u),
-                    v
-                );
-                // Perlin noise theoretical range is ~[-sqrt(N/4), sqrt(N/4)] where N is dimensions (2)
-                // So range is roughly [-0.707, 0.707]. Normalize closer to -1 to 1.
-                return Math.max(-1, Math.min(1, lerpVal * 1.4));
-            }
-
-            _lerp(a, b, t) {
-                return a + t * (b - a);
-            }
+      /**
+       * Gets or generates a pseudo-random 2D gradient vector for given integer coordinates.
+       * Caches generated gradients for performance.
+       * @param {number} x - Integer x-coordinate of the grid point.
+       * @param {number} y - Integer y-coordinate of the grid point.
+       * @returns {number[]} A 2D array representing the gradient vector [gx, gy].
+       */
+      gradient(x, y) {
+        const k = x + '|' + y; // Create a unique key for the grid point
+        if (!this.g.has(k)) { // Check if gradient is already cached
+          const a = this._rand() * Math.PI * 2; // Generate a random angle
+          // Calculate and store the gradient vector components (cos, sin)
+          this.g.set(k, [Math.cos(a), Math.sin(a)]);
         }
+        return this.g.get(k); // Return the cached or newly generated gradient
+      }
 
-        class TerrainGenerator {
-            constructor() {
-                this.MAX_OCTAVES = 8;
-                this.BASE_MOVE_SPEED = 450; // Adjusted pixels per second
+      /**
+       * The fade function as defined by Ken Perlin (6t^5 - 15t^4 + 10t^3).
+       * It smooths the interpolation, resulting in more natural-looking noise.
+       * @param {number} t - The value to fade, typically between 0 and 1.
+       * @returns {number} The smoothed value.
+       */
+      fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 
-                this.initNoise();
-                this.initParams();
-                this.initDOM();
-                this.initEvents();
+      /**
+       * Linear interpolation between two values.
+       * @param {number} a - The start value.
+       * @param {number} b - The end value.
+       * @param {number} t - The interpolation factor (usually between 0 and 1).
+       * @returns {number} The interpolated value.
+       */
+      lerp(a, b, t) { return a + t * (b - a); }
 
-                this.keysPressed = {};
-                this.lastTimestamp = 0;
-                this.needsRender = true;
-                this.renderDebounce = null;
-                this.animationFrameId = null;
+      /**
+       * Calculates the Perlin noise value for a given 2D point (x, y).
+       * @param {number} x - The x-coordinate.
+       * @param {number} y - The y-coordinate.
+       * @returns {number} The Perlin noise value, typically clamped between -1 and 1.
+       */
+      get(x, y) {
+        // Determine grid cell coordinates (integer part)
+        const X = Math.floor(x), Y = Math.floor(y);
+        // Determine relative position within the cell (fractional part)
+        const dx = x - X, dy = y - Y;
 
-                this.updateLoop(performance.now());
+        // Get gradient vectors for the four corners of the grid cell
+        const g00 = this.gradient(X, Y),     g10 = this.gradient(X + 1, Y),
+              g01 = this.gradient(X, Y + 1), g11 = this.gradient(X + 1, Y + 1);
+
+        // Calculate dot products between gradient vectors and distance vectors
+        // Distance vector from corner (e.g., (dx, dy) for corner 00)
+        const p00 = dx * g00[0] + dy * g00[1],
+              p10 = (dx - 1) * g10[0] + dy * g10[1], // dx-1 because vector points from (X+1, Y) to (x,y)
+              p01 = dx * g01[0] + (dy - 1) * g01[1], // dy-1 because vector points from (X, Y+1) to (x,y)
+              p11 = (dx - 1) * g11[0] + (dy - 1) * g11[1]; // dx-1, dy-1
+
+        // Apply the fade function to the relative x and y coordinates for smooth interpolation
+        const u = this.fade(dx), v = this.fade(dy);
+
+        // Interpolate the dot products along the x-axis
+        const a = this.lerp(p00, p10, u);
+        const b = this.lerp(p01, p11, u);
+
+        // Interpolate the results along the y-axis to get the final noise value
+        // Scale by ~1.4 to approximate the [-1, 1] range more closely
+        // Clamp the result to [-1, 1] to ensure it stays within expected bounds
+        return Math.max(-1, Math.min(1, this.lerp(a, b, v) * 1.4));
+      }
+    }
+
+    /**
+     * Main class for the Terrain Generator application.
+     * Handles canvas setup, UI interactions, rendering loop, and terrain generation logic.
+     */
+    class Terrain {
+      /**
+       * Initializes the terrain generator application.
+       */
+      constructor() {
+        // Canvas and rendering context setup
+        this.can = document.getElementById('terrainCanvas');
+        this.ctx = this.can.getContext('2d');
+        this.dpr = window.devicePixelRatio || 1; // Handle high DPI displays
+
+        // Initial parameters for terrain generation and appearance
+        this.p = {
+          preset: 'earth',      // Current preset name
+          mode: 'atlas',        // Rendering mode ('bw' or 'atlas')
+          tileSize: 15,         // Size of each terrain tile in pixels
+          heightScale: 1.0,     // Multiplier for the generated noise height
+          seaLevel: 0.35,       // Noise threshold for water level (normalized 0-1)
+          noiseScale: 150,      // Controls the "zoom" level of the noise features
+          octaves: 4,           // Number of noise layers combined for fractal noise
+          persistence: 0.6,     // Amplitude reduction factor for subsequent octaves
+          lacunarity: 2.0,      // Frequency increase factor for subsequent octaves
+          showGrid: false       // Whether to draw grid lines between tiles
+        };
+
+        // Default color palette (Earth Classic)
+        this.c = {
+          deepWater: '#1a5cb3', shallowWater: '#3a7ccb',
+          sand: '#f2d2a9', grass: '#7dab6e', forest: '#4a6b3e',
+          rock: '#8c7d70', snow: '#f0f0f0'
+        };
+
+        // Calculate initial color transition ranges based on sea level
+        this.updateRanges();
+
+        // Viewport state (for panning)
+        this.view = {
+          x: 0,           // Top-left world x-coordinate visible
+          y: 0,           // Top-left world y-coordinate visible
+          drag: false,    // Is the user currently dragging the mouse?
+          px: 0,          // Previous mouse x during drag
+          py: 0           // Previous mouse y during drag
+        };
+
+        // Keyboard state for panning
+        this.keys = {};       // Stores currently pressed movement keys
+        this.lastT = 0;       // Timestamp of the last frame for delta time calculation
+        this.need = true;     // Flag indicating if a re-render is needed
+
+        // Instantiate the noise generator
+        this.noise = new Perlin(); // Uses default seed (current time) initially
+
+        // Setup UI, event listeners, and start the main loop
+        this.bindUI();
+        this.bindEvents();
+        window.addEventListener('resize', () => this.resize()); // Handle window resize
+        this.resize(); // Initial setup of canvas size
+        requestAnimationFrame(ts => this.loop(ts)); // Start the animation loop
+      }
+
+      /**
+       * Updates the normalized height ranges for different terrain colors.
+       * These ranges are relative to the current sea level.
+       */
+      updateRanges() {
+        const s = this.p.seaLevel; // Current sea level (normalized 0-1, where 0 is -1 noise, 1 is +1 noise)
+        // Define thresholds for each color band based on sea level
+        this.r = {
+          d: s * 0.75,     // Deep water ends below sea level
+          sh: s,           // Shallow water ends at sea level
+          sa: s + 0.05,    // Sand ends slightly above sea level
+          g: s + 0.20,     // Grass ends
+          f: s + 0.45,     // Forest ends
+          ro: s + 0.65,    // Rock ends
+          sn: 1.0         // Snow covers everything above rock (up to max height 1.0)
+        };
+        // Note: These ranges assume noise values are normalized between 0 and 1 in getColor()
+      }
+
+      /**
+       * Handles window resize events. Adjusts canvas dimensions and scale for DPI.
+       */
+      resize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        // Set canvas backing store size based on DPI
+        this.can.width = w * this.dpr;
+        this.can.height = h * this.dpr;
+        // Set display size using CSS
+        this.can.style.width = w + 'px';
+        this.can.style.height = h + 'px';
+        // Scale the context to match DPI (draws sharper graphics)
+        this.ctx.scale(this.dpr, this.dpr);
+        this.need = true; // Trigger a re-render after resize
+      }
+
+      /**
+       * Updates the UI control elements (sliders, dropdowns, text displays)
+       * to reflect the current parameter values in `this.p`.
+       */
+      bindUI() {
+        // Map parameter keys to their corresponding UI element IDs and suffixes
+        const M = {
+          tileSize: ['tileSize', 'tileSizeVal', 'px'],
+          heightScale: ['heightScale', 'heightScaleVal', '×'],
+          seaLevel: ['seaLevel', 'seaLevelVal', ''],
+          noiseScale: ['noiseScale', 'noiseScaleVal', ''],
+          octaves: ['octaves', 'octavesVal', ''],
+          persistence: ['persistence', 'persistenceVal', ''],
+          lacunarity: ['lacunarity', 'lacunarityVal', '']
+        };
+        // Update each mapped control
+        for (let k in M) {
+          const [id, valId, suf] = M[k];
+          const inputElement = document.getElementById(id);
+          const valueElement = document.getElementById(valId);
+          const value = this.p[k];
+
+          if (inputElement) inputElement.value = value;
+          if (valueElement) {
+            // Format the displayed value based on the parameter type
+            let formattedValue;
+            if (id === 'heightScale' || id === 'lacunarity') {
+                formattedValue = value.toFixed(1);
+            } else if (id === 'persistence' || id === 'seaLevel') {
+                formattedValue = value.toFixed(2);
+            } else {
+                formattedValue = value.toFixed(0);
             }
-
-            initNoise() {
-                this.perlin = new PerlinNoise(Date.now());
-                this.lastSeed = Date.now();
-                // Clear gradient cache on new seed
-                this.perlin.gradients.clear();
-            }
-
-            initParams() {
-                this.view = {
-                    x: 0, y: 0,
-                    // zoom: 1, // Zoom removed
-                    isDragging: false, lastX: 0, lastY: 0
-                };
-
-                this.params = {
-                    gridDensity: 30,
-                    heightRange: 1.0, // Now a multiplier for noise output
-                    noiseScale: 150,
-                    octaves: 4,
-                    persistence: 0.6,
-                    lacunarity: 2,
-                    seaLevel: 0.35,
-                    colorMode: 'atlas',
-                    colors: {
-                        deepWater: '#0f2c4a', shallowWater: '#1a4a7a', sand: '#e8d5a8',
-                        grass: '#6b8c42', forest: '#3a5a2a', rock: '#6a5a4a', snow: '#d0e0f0'
-                    },
-                    biomeRanges: {}
-                };
-
-                this.updateBiomeRanges();
-            }
-
-            initDOM() {
-                document.getElementById('gridDensity').value = this.params.gridDensity;
-                // document.getElementById('zoom').value = this.view.zoom; // Removed
-                document.getElementById('heightRange').value = this.params.heightRange;
-                document.getElementById('seaLevel').value = this.params.seaLevel;
-                document.getElementById('noiseScale').value = this.params.noiseScale;
-                document.getElementById('octaves').value = this.params.octaves;
-                document.getElementById('persistence').value = this.params.persistence;
-                document.getElementById('lacunarity').value = this.params.lacunarity;
-
-                const colorIds = ['DeepWater', 'ShallowWater', 'Sand', 'Grass', 'Forest', 'Rock', 'Snow'];
-                colorIds.forEach(id => {
-                    const key = id.charAt(0).toLowerCase() + id.slice(1);
-                    if(document.getElementById(`color${id}`)) {
-                         document.getElementById(`color${id}`).value = this.params.colors[key];
-                    }
-                   if(document.getElementById(`preview${id}`)) {
-                       document.getElementById(`preview${id}`).style.backgroundColor = this.params.colors[key];
-                   }
-                });
-
-                this.updateValueDisplays();
-            }
-
-            updateValueDisplays() {
-                document.getElementById('gridDensityValue').textContent = this.params.gridDensity;
-                // document.getElementById('zoomValue').textContent = this.view.zoom.toFixed(1); // Removed
-                document.getElementById('heightRangeValue').textContent = this.params.heightRange.toFixed(1) + 'x';
-                document.getElementById('seaLevelValue').textContent = this.params.seaLevel.toFixed(2);
-                document.getElementById('noiseScaleValue').textContent = this.params.noiseScale;
-                document.getElementById('octavesValue').textContent = this.params.octaves;
-                document.getElementById('persistenceValue').textContent = this.params.persistence.toFixed(2);
-                document.getElementById('lacunarityValue').textContent = this.params.lacunarity.toFixed(1);
-            }
-
-            initEvents() {
-                const requestRender = () => {
-                    this.needsRender = true;
-                };
-
-                const controls = [
-                    'gridDensity', 'heightRange', 'seaLevel',
-                    'noiseScale', 'octaves', 'persistence', 'lacunarity'
-                ];
-                controls.forEach(id => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.addEventListener('input', e => {
-                            this.params[id] = parseFloat(e.target.value);
-                            if (id === 'seaLevel') this.updateBiomeRanges();
-                            if (id === 'gridDensity' || id === 'heightRange') {
-                                // Force full redraw if tile size or height scale changes
-                                this.clearGrid();
-                            }
-                            this.updateValueDisplays();
-                            requestRender();
-                        });
-                    }
-                });
-                // Removed Zoom slider event listener
-
-                const colorIds = ['DeepWater', 'ShallowWater', 'Sand', 'Grass', 'Forest', 'Rock', 'Snow'];
-                colorIds.forEach(id => {
-                    const colorInput = document.getElementById(`color${id}`);
-                    const preview = document.getElementById(`preview${id}`);
-                    if (colorInput && preview) {
-                        const key = id.charAt(0).toLowerCase() + id.slice(1);
-                        colorInput.addEventListener('input', e => {
-                            this.params.colors[key] = e.target.value;
-                            preview.style.backgroundColor = e.target.value;
-                            requestRender();
-                        });
-                    }
-                });
-
-                document.getElementById('preset-select').addEventListener('change', e => {
-                    this.setPreset(e.target.value);
-                    this.clearGrid(); // Force redraw on preset change
-                    requestRender();
-                });
-
-                document.getElementById('regenerate').addEventListener('click', () => {
-                    this.initNoise();
-                    this.clearGrid(); // Force redraw with new noise
-                    requestRender();
-                });
-
-                document.addEventListener('keydown', e => {
-                    const key = e.key.toLowerCase();
-                    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) {
-                         this.keysPressed[key] = true;
-                         e.preventDefault(); // Prevent browser scroll
-                    } else {
-                         switch(key) {
-                            // case '+': case '=': // Zoom removed
-                            // case '-': case '_': // Zoom removed
-                            //     break;
-                            case 'r':
-                                this.initNoise();
-                                this.clearGrid();
-                                requestRender();
-                                break;
-                            case 'c': this.toggleControls(); break;
-                        }
-                    }
-                });
-                document.addEventListener('keyup', e => {
-                     const key = e.key.toLowerCase();
-                     if (key in this.keysPressed) {
-                         this.keysPressed[key] = false;
-                     }
-                });
-
-                document.addEventListener('mousedown', e => {
-                    if (e.target.closest('#controls') || e.target.closest('#toggle-controls')) return;
-                    if (e.button === 0) {
-                        this.view.isDragging = true;
-                        [this.view.lastX, this.view.lastY] = [e.clientX, e.clientY];
-                        document.body.style.cursor = 'grabbing';
-                    }
-                });
-
-                document.addEventListener('mousemove', e => {
-                    if (this.view.isDragging) {
-                        const dx = e.clientX - this.view.lastX;
-                        const dy = e.clientY - this.view.lastY;
-                        // Panning moves the view opposite to mouse drag
-                        this.view.x -= dx; // No zoom adjustment needed
-                        this.view.y -= dy;
-                        [this.view.lastX, this.view.lastY] = [e.clientX, e.clientY];
-                        requestRender();
-                    }
-                });
-
-                document.addEventListener('mouseup', () => {
-                    if (this.view.isDragging) {
-                        this.view.isDragging = false;
-                        document.body.style.cursor = '';
-                    }
-                });
-                 document.addEventListener('mouseleave', () => {
-                    if (this.view.isDragging) {
-                        this.view.isDragging = false;
-                        document.body.style.cursor = '';
-                    }
-                });
-
-                // Removed Mouse wheel zoom listener
-
-                document.getElementById('toggle-controls').addEventListener('click', () => this.toggleControls());
-
-                window.addEventListener('resize', () => {
-                    clearTimeout(window.resizeTimer);
-                    window.resizeTimer = setTimeout(() => {
-                        if (window.terrainApp) {
-                            this.clearGrid(); // Force redraw on resize
-                            requestRender();
-                        }
-                    }, 150); // Slightly longer debounce for resize
-                });
-            }
-
-            toggleControls() {
-                 const controls = document.getElementById('controls');
-                 const toggleBtn = document.getElementById('toggle-controls');
-                 const helpText = document.getElementById('help-text');
-                 controls.classList.toggle('collapsed');
-                 if (controls.classList.contains('collapsed')) {
-                     toggleBtn.textContent = '▶';
-                     toggleBtn.title = 'Show Controls Panel (C)';
-                     helpText.style.left = '8px'; // Update help text position
-                 } else {
-                     toggleBtn.textContent = '◀';
-                     toggleBtn.title = 'Hide Controls Panel (C)';
-                     helpText.style.left = '310px'; // Update help text position
-                 }
-            }
-
-            updateLoop(timestamp) {
-                // Ensure lastTimestamp is initialized
-                if (this.lastTimestamp === 0) this.lastTimestamp = timestamp;
-
-                const deltaTime = Math.min(timestamp - this.lastTimestamp, 50); // Cap delta time (ms) to prevent large jumps
-                this.lastTimestamp = timestamp;
-
-                let moved = false;
-                const moveSpeed = this.BASE_MOVE_SPEED * (deltaTime / 1000); // pixels per frame
-
-                let dx = 0;
-                let dy = 0;
-
-                if (this.keysPressed['arrowup'] || this.keysPressed['w']) dy -= 1;
-                if (this.keysPressed['arrowdown'] || this.keysPressed['s']) dy += 1;
-                if (this.keysPressed['arrowleft'] || this.keysPressed['a']) dx -= 1;
-                if (this.keysPressed['arrowright'] || this.keysPressed['d']) dx += 1;
-
-                if (dx !== 0 || dy !== 0) {
-                    const length = Math.sqrt(dx * dx + dy * dy);
-                    dx = (dx / length) * moveSpeed;
-                    dy = (dy / length) * moveSpeed;
-
-                    this.view.x += dx;
-                    this.view.y += dy;
-                    moved = true;
-                }
-
-                if (moved) {
-                    this.needsRender = true;
-                }
-
-                if (this.needsRender) {
-                    this.render();
-                    this.needsRender = false;
-                }
-
-                this.animationFrameId = requestAnimationFrame(ts => this.updateLoop(ts));
-            }
-
-            // Removed adjustZoom function
-
-            updateBiomeRanges() {
-                const sea = this.params.seaLevel;
-                this.params.biomeRanges = {
-                    deepWater: sea * 0.75, shallowWater: sea, sand: sea + 0.05,
-                    grass: sea + 0.20, forest: sea + 0.45, rock: sea + 0.65, snow: 1.0
-                };
-                for (const key in this.params.biomeRanges) {
-                    this.params.biomeRanges[key] = Math.max(0, Math.min(1, this.params.biomeRanges[key]));
-                 }
-            }
-
-             setPreset(preset) {
-                this.params.colorMode = preset === 'bw' ? 'bw' : 'atlas';
-                const presets = {
-                    // Presets now use heightRange as 1.0 (base)
-                    terrain: {
-                        colors: { deepWater: '#1a5cb3', shallowWater: '#3a7ccb', sand: '#f2d2a9', grass: '#7dab6e', forest: '#4a6b3e', rock: '#8c7d70', snow: '#f0f0f0' },
-                        noise: [120, 4, 0.5, 2, 1.0, 0.38] // scale, oct, pers, lac, heightScale, sea
-                    },
-                    atlas: {
-                        colors: { deepWater: '#0f2c4a', shallowWater: '#1a4a7a', sand: '#e8d5a8', grass: '#6b8c42', forest: '#3a5a2a', rock: '#6a5a4a', snow: '#d0e0f0' },
-                        noise: [150, 5, 0.6, 2.1, 1.0, 0.35]
-                    },
-                    realistic: {
-                        colors: { deepWater: '#0a2342', shallowWater: '#1a4a7a', sand: '#d7c9aa', grass: '#5a8f3d', forest: '#2d5a3a', rock: '#7a6a5a', snow: '#f0f8ff' },
-                        noise: [250, 6, 0.55, 2.2, 1.2, 0.40] // Slightly higher default height scale
-                    },
-                    mars: {
-                        colors: { deepWater: '#5a3a3a', shallowWater: '#7c5a5a', sand: '#c1876b', grass: '#9c6a52', forest: '#7a4a3a', rock: '#5a3a3a', snow: '#d4b4a4' },
-                        noise: [180, 5, 0.7, 2.5, 1.4, 0.15] // Higher height scale, low sea
-                    },
-                    islands: {
-                        colors: { deepWater: '#1a3e7a', shallowWater: '#2a5c9a', sand: '#f2d2a9', grass: '#7dab6e', forest: '#4a6b3e', rock: '#8c7d70', snow: '#f0f0f0' },
-                        noise: [90, 4, 0.45, 1.9, 0.8, 0.48] // Lower height scale, high sea
-                    }
-                };
-
-                 if (preset !== 'bw') {
-                     const p = presets[preset] || presets['atlas'];
-                     Object.assign(this.params.colors, p.colors);
-                     [
-                        this.params.noiseScale, this.params.octaves, this.params.persistence,
-                        this.params.lacunarity, this.params.heightRange, this.params.seaLevel
-                     ] = p.noise;
-                    this.initDOM(); // Update all UI elements
-                 } else {
-                     // If BW, reset height range to 1.0 perhaps? Or keep the current one? Let's keep it.
-                     // Reset colors doesn't matter for BW mode.
-                     this.updateValueDisplays(); // Update sliders if only mode changed
-                 }
-
-                this.updateBiomeRanges();
-            }
-
-
-            fractalNoise(worldX, worldY) {
-                let value = 0, amplitude = 1, frequency = 1, maxValue = 0;
-                // Removed effectiveScale, use noiseScale directly
-                const scale = this.params.noiseScale;
-
-                for (let i = 0; i < this.params.octaves; i++) {
-                    // Added small offsets to each octave sample to break up grid artifacts
-                    const offX = (i + 1) * 100.123;
-                    const offY = (i + 1) * 50.456;
-                    const sampleX = (worldX + offX) * frequency / scale;
-                    const sampleY = (worldY + offY) * frequency / scale;
-
-                    const noiseValue = this.perlin.get(sampleX , sampleY);
-
-                    value += noiseValue * amplitude;
-                    maxValue += amplitude;
-                    amplitude *= this.params.persistence;
-                    frequency *= this.params.lacunarity;
-
-                    if (amplitude < 0.01) break;
-                }
-
-                const normalizedValue = value / maxValue;
-                // Apply height range scaling here before returning
-                const scaledValue = normalizedValue * this.params.heightRange;
-                return Math.max(-1, Math.min(1, scaledValue)); // Clamp final scaled value
-            }
-
-            getTerrainColor(heightValue) {
-                const normalized = (heightValue + 1) / 2; // Map -1..1 to 0..1
-                const ranges = this.params.biomeRanges;
-                const colors = this.params.colors;
-
-                // Handle potential division by zero if ranges are identical
-                const safeDiv = (a, b) => (b === 0 ? 1e9 : a / b); // Return large number if divisor is 0
-
-                if (normalized <= ranges.deepWater) return colors.deepWater;
-                if (normalized <= ranges.shallowWater)
-                    return this.blendColors(colors.deepWater, colors.shallowWater,
-                        safeDiv(normalized - ranges.deepWater, ranges.shallowWater - ranges.deepWater));
-                if (normalized <= ranges.sand)
-                    return this.blendColors(colors.shallowWater, colors.sand,
-                        safeDiv(normalized - ranges.shallowWater, ranges.sand - ranges.shallowWater));
-                if (normalized <= ranges.grass)
-                    return this.blendColors(colors.sand, colors.grass,
-                         safeDiv(normalized - ranges.sand, ranges.grass - ranges.sand));
-                if (normalized <= ranges.forest)
-                    return this.blendColors(colors.grass, colors.forest,
-                        safeDiv(normalized - ranges.grass, ranges.forest - ranges.grass));
-                if (normalized <= ranges.rock)
-                    return this.blendColors(colors.forest, colors.rock,
-                        safeDiv(normalized - ranges.forest, ranges.rock - ranges.forest));
-
-                // Use explicit snow range if defined, otherwise blend rock to snow up to 1.0
-                 if (ranges.snow && normalized <= ranges.snow && ranges.snow > ranges.rock)
-                     return this.blendColors(colors.rock, colors.snow,
-                        safeDiv(normalized - ranges.rock, ranges.snow - ranges.rock));
-
-                return colors.snow;
-            }
-
-
-            blendColors(c1, c2, ratio) {
-                ratio = Math.max(0, Math.min(1, ratio));
-                if (isNaN(ratio)) ratio = 0; // Safety check
-
-                const r1 = parseInt(c1.substring(1, 3), 16);
-                const g1 = parseInt(c1.substring(3, 5), 16);
-                const b1 = parseInt(c1.substring(5, 7), 16);
-                const r2 = parseInt(c2.substring(1, 3), 16);
-                const g2 = parseInt(c2.substring(3, 5), 16);
-                const b2 = parseInt(c2.substring(5, 7), 16);
-
-                const r = Math.round(r1 + (r2 - r1) * ratio);
-                const g = Math.round(g1 + (g2 - g1) * ratio);
-                const b = Math.round(b1 + (b2 - b1) * ratio);
-
-                return `#${(1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).padStart(6, '0')}`;
-            }
-
-            clearGrid() {
-                 const container = document.getElementById('heightmap');
-                 while (container.firstChild) {
-                    container.removeChild(container.firstChild);
-                 }
-                 this.tileCache = []; // Clear cache if used (not strictly needed with current approach)
-                 this.needsRender = true; // Ensure it re-renders
-            }
-
-            render() {
-                const container = document.getElementById('heightmap');
-                const width = window.innerWidth;
-                const height = window.innerHeight;
-
-                const tileSize = Math.max(5, this.params.gridDensity);
-
-                const numCols = Math.ceil(width / tileSize) + 2; // Extra buffer for smoother panning
-                const numRows = Math.ceil(height / tileSize) + 2;
-
-                container.style.gridTemplateColumns = `repeat(${numCols}, ${tileSize}px)`;
-                container.style.gridTemplateRows = `repeat(${numRows}, ${tileSize}px)`;
-                // Set container size explicitly to match grid
-                container.style.width = `${numCols * tileSize}px`;
-                container.style.height = `${numRows * tileSize}px`;
-
-
-                const startCol = Math.floor(this.view.x / tileSize);
-                const startRow = Math.floor(this.view.y / tileSize);
-                // Calculate offset to keep the top-left visually static during panning
-                const offsetX = -(this.view.x % tileSize);
-                const offsetY = -(this.view.y % tileSize);
-
-
-                // Use transform for potentially smoother panning than top/left
-                container.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-
-                const totalTiles = numCols * numRows;
-
-                let tiles = Array.from(container.children);
-                if (tiles.length !== totalTiles) {
-                    // If counts differ, fully rebuild the grid for simplicity now
-                    this.clearGrid(); // Clear existing
-                    const fragment = document.createDocumentFragment();
-                    for (let i = 0; i < totalTiles; i++) {
-                        const tile = document.createElement('div');
-                        tile.className = 'tile';
-                        fragment.appendChild(tile);
-                    }
-                    container.appendChild(fragment);
-                    tiles = Array.from(container.children); // Refresh the list
-                }
-
-
-                let tileIndex = 0;
-                for (let r = 0; r < numRows; r++) {
-                    for (let c = 0; c < numCols; c++) {
-                        const tile = tiles[tileIndex++];
-                        if (!tile) continue;
-
-                        const worldX = (startCol + c) * tileSize; // Use corner for noise consistency
-                        const worldY = (startRow + r) * tileSize;
-
-                        const noiseValue = this.fractalNoise(worldX, worldY);
-
-                        if (this.params.colorMode === 'bw') {
-                            const grayValue = Math.floor(((noiseValue + 1) / 2) * 255);
-                            tile.style.backgroundColor = `rgb(${grayValue},${grayValue},${grayValue})`;
-                            tile.title = `Val: ${noiseValue.toFixed(3)}`;
-                        } else {
-                            tile.style.backgroundColor = this.getTerrainColor(noiseValue);
-                            const displayHeight = ((noiseValue + 1) / 2).toFixed(3);
-                            tile.title = `H: ${displayHeight}`;
-                        }
-                    }
-                }
-
-                document.getElementById('position-display').textContent =
-                    `X: ${Math.round(this.view.x)}, Y: ${Math.round(this.view.y)}`;
-            }
+            valueElement.textContent = formattedValue + suf;
+          }
         }
+        // Update checkbox and preset dropdown
+        const showGridCheckbox = document.getElementById('showGrid');
+        const presetSelect = document.getElementById('preset');
+        if (showGridCheckbox) showGridCheckbox.checked = this.p.showGrid;
+        if (presetSelect) presetSelect.value = this.p.preset;
+      }
 
-        window.addEventListener('load', () => {
-            window.terrainApp = new TerrainGenerator();
+      /**
+       * Attaches event listeners to UI elements and window events.
+       */
+      bindEvents() {
+        // Sliders and numeric inputs
+        ['tileSize', 'heightScale', 'seaLevel', 'noiseScale', 'octaves', 'persistence', 'lacunarity']
+        .forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.oninput = (e) => {
+              this.p[id] = parseFloat(e.target.value);
+              // Special handling for sea level changes
+              if (id === 'seaLevel') this.updateRanges();
+              this.bindUI(); // Update the displayed value
+              this.need = true; // Trigger re-render
+            };
+          }
         });
 
-        window.addEventListener('beforeunload', () => {
-             if (window.terrainApp && window.terrainApp.animationFrameId) {
-                cancelAnimationFrame(window.terrainApp.animationFrameId);
-            }
+        // Grid checkbox
+        const showGridCheckbox = document.getElementById('showGrid');
+        if (showGridCheckbox) {
+            showGridCheckbox.onchange = (e) => {
+            this.p.showGrid = e.target.checked;
+            this.need = true;
+            };
+        }
+
+
+        // Preset dropdown
+        const presetSelect = document.getElementById('preset');
+        if (presetSelect) {
+            presetSelect.onchange = (e) => this.applyPreset(e.target.value);
+        }
+
+
+        // Regenerate button
+        const regenerateButton = document.getElementById('regenerate');
+        if (regenerateButton) {
+            regenerateButton.onclick = () => {
+                this.noise = new Perlin(); // Create new noise instance with new seed
+                this.need = true;
+            };
+        }
+
+        // Sidebar toggle button
+        const toggleButton = document.getElementById('toggleBtn');
+        const sidebar = document.getElementById('sidebar');
+        if (toggleButton && sidebar) {
+            toggleButton.onclick = () => {
+                sidebar.classList.toggle('collapsed');
+                // Update button icon based on collapsed state
+                toggleButton.textContent = sidebar.classList.contains('collapsed') ? '⮞' : '⮜';
+                // Small delay before resizing might help prevent visual glitches during transition
+                setTimeout(() => this.resize(), 50);
+            };
+        }
+
+        // Mouse dragging for panning
+        window.addEventListener('mousedown', e => {
+          // Ignore clicks on the sidebar or non-left clicks
+          if (e.button !== 0 || e.target.closest('#sidebar')) return;
+          this.view.drag = true;
+          this.view.px = e.clientX;
+          this.view.py = e.clientY;
+          this.can.style.cursor = 'grabbing'; // Change cursor on drag
         });
 
-    </script>
+        window.addEventListener('mousemove', e => {
+          if (!this.view.drag) return;
+          const dx = e.clientX - this.view.px;
+          const dy = e.clientY - this.view.py;
+          // Update view position based on mouse movement
+          this.view.x -= dx;
+          this.view.y -= dy;
+          // Store current mouse position for next movement calculation
+          this.view.px = e.clientX;
+          this.view.py = e.clientY;
+          this.need = true; // Trigger re-render
+        });
+
+        window.addEventListener('mouseup', () => {
+          if (this.view.drag) {
+            this.view.drag = false;
+            this.can.style.cursor = 'grab'; // Restore cursor
+          }
+        });
+         // Set initial cursor state
+        this.can.style.cursor = 'grab';
+
+        // Keyboard events for panning and regenerating
+        window.addEventListener('keydown', e => {
+          const key = e.key.toLowerCase();
+          // Regenerate seed on 'r'
+          if (key === 'r') {
+            this.noise = new Perlin();
+            this.need = true;
+          }
+          // Set key state for panning keys
+          if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+            this.keys[key] = true;
+            e.preventDefault(); // Prevent default browser scroll behavior
+          }
+        });
+
+        window.addEventListener('keyup', e => {
+          const key = e.key.toLowerCase();
+          // Clear key state when released
+          if (this.keys[key] != null) {
+            this.keys[key] = false;
+          }
+        });
+      }
+
+      /**
+       * Applies a selected preset configuration.
+       * Updates parameters, colors, and triggers a re-render.
+       * @param {string} presetName - The name of the preset to apply.
+       */
+      applyPreset(presetName) {
+        // Define preset configurations
+        const presets = {
+          bw: { mode: 'bw' }, // Special black and white mode
+          earth: {
+            noise: [150, 4, 0.5, 2.0, 1.0, 0.35], // [noiseScale, octaves, persistence, lacunarity, heightScale, seaLevel]
+            cols: { deepWater: '#1a5cb3', shallowWater: '#3a7ccb', sand: '#f2d2a9', grass: '#7dab6e', forest: '#4a6b3e', rock: '#8c7d70', snow: '#f0f0f0' }
+          },
+          mars: {
+            noise: [180, 4, 0.6, 2.0, 1.2, 0.20],
+            cols: { deepWater: '#5a3a3a', shallowWater: '#7c5a5a', sand: '#c1876b', grass: '#9c6a52', forest: '#7a4a3a', rock: '#5a3a3a', snow: '#d4b4a4' }
+          },
+          islands: {
+            noise: [90, 4, 0.45, 1.9, 0.8, 0.48],
+            cols: { deepWater: '#1a3e7a', shallowWater: '#2a5c9a', sand: '#f2d2a9', grass: '#7dab6e', forest: '#4a6b3e', rock: '#8c7d70', snow: '#f0f0f0' }
+          },
+          snowyTundra: {
+            noise: [200, 5, 0.5, 2.0, 1.1, 0.45],
+            cols: { deepWater: '#0a1f2b', shallowWater: '#16465a', sand: '#c1d8e3', grass: '#d8eaf1', forest: '#e6f2f9', rock: '#a8bcc9', snow: '#f0fcff' }
+          },
+          volcanic: {
+            noise: [80, 3, 0.4, 2.5, 1.6, 0.20],
+            cols: { deepWater: '#2f0a0a', shallowWater: '#4f1a1a', sand: '#704030', grass: '#602020', forest:'#501010', rock: '#703030', snow: '#8f6060' }
+           },
+          alienWorld: {
+            noise: [120, 6, 0.7, 2.5, 1.3, 0.40],
+            cols: { deepWater: '#1d002b', shallowWater: '#3a0057', sand: '#5c008d', grass: '#7d00c3', forest: '#a000ff', rock: '#c24aff', snow: '#e071ff' }
+          },
+          cybergrid: {
+            noise: [80, 5, 0.4, 1.5, 1.0, 0.35],
+            cols: { deepWater: '#0a0a0a', shallowWater: '#002828', sand: '#005050', grass: '#008080', forest: '#00d8d8', rock: '#00ffff', snow: '#80ffff' }
+          }
+        };
+
+        // Get the selected preset configuration, default to 'earth' if not found
+        const cfg = presets[presetName] || presets.earth;
+
+        // Apply the preset settings
+        if (cfg.mode === 'bw') {
+          this.p.mode = 'bw';
+          // Optionally reset some noise params for BW mode, or leave them
+        } else {
+          // Destructure noise parameters and apply them
+          const [ns, oc, pe, la, hs, sl] = cfg.noise;
+          Object.assign(this.p, {
+            mode: 'atlas', // Ensure mode is set to color atlas
+            noiseScale: ns, octaves: oc, persistence: pe,
+            lacunarity: la, heightScale: hs, seaLevel: sl
+          });
+          // Apply the color palette
+          this.c = cfg.cols;
+          // Recalculate color ranges based on the new sea level
+          this.updateRanges();
+        }
+
+        // Update the preset name parameter and refresh the UI
+        this.p.preset = presetName;
+        this.bindUI();
+        this.need = true; // Trigger re-render
+      }
+
+      /**
+       * Generates fractal noise (Fractional Brownian Motion - FBM) at a given point.
+       * It sums multiple layers (octaves) of Perlin noise with varying frequencies and amplitudes.
+       * @param {number} x - The world x-coordinate.
+       * @param {number} y - The world y-coordinate.
+       * @returns {number} The fractal noise value, typically between -1 and 1 (scaled by heightScale).
+       */
+      fractal(x, y) {
+        let totalValue = 0;
+        let amplitude = 1.0;     // Initial amplitude
+        let frequency = 1.0;     // Initial frequency
+        let maxAmplitude = 0;    // Used for normalization
+
+        for (let i = 0; i < this.p.octaves; i++) {
+          // Get Perlin noise value for this octave
+          // Apply frequency scaling and add small offsets per octave to decorrelate layers
+          const noiseVal = this.noise.get(
+            (x + i * 100) * frequency / this.p.noiseScale, // Offset x slightly per octave
+            (y + i * 50) * frequency / this.p.noiseScale   // Offset y slightly per octave
+          );
+
+          // Add the noise value scaled by the current amplitude
+          totalValue += noiseVal * amplitude;
+
+          // Track the maximum possible amplitude for normalization
+          maxAmplitude += amplitude;
+
+          // Update amplitude and frequency for the next octave
+          amplitude *= this.p.persistence; // Decrease amplitude
+          frequency *= this.p.lacunarity; // Increase frequency
+
+          // Optimization: break early if amplitude becomes negligible
+          if (amplitude < 0.01) break;
+        }
+
+        // Normalize the result to the range [-1, 1] and apply height scale
+        // Avoid division by zero if maxAmplitude is somehow 0
+        const normalizedValue = maxAmplitude === 0 ? 0 : totalValue / maxAmplitude;
+        return normalizedValue * this.p.heightScale;
+      }
+
+      /**
+       * Linearly interpolates between two hex color strings.
+       * @param {string} colorA - Start color (e.g., "#RRGGBB").
+       * @param {string} colorB - End color (e.g., "#RRGGBB").
+       * @param {number} t - Interpolation factor (clamped between 0 and 1).
+       * @returns {string} The interpolated hex color string.
+       */
+      mix(colorA, colorB, t) {
+          // Clamp t to the valid range [0, 1]
+          t = Math.max(0, Math.min(1, t));
+
+          // Parse hex colors into RGB integer components
+          const parseHex = hex => parseInt(hex, 16);
+          const r1 = parseHex(colorA.slice(1, 3)), g1 = parseHex(colorA.slice(3, 5)), b1 = parseHex(colorA.slice(5, 7));
+          const r2 = parseHex(colorB.slice(1, 3)), g2 = parseHex(colorB.slice(3, 5)), b2 = parseHex(colorB.slice(5, 7));
+
+          // Interpolate each color component
+          const r = Math.round(r1 + (r2 - r1) * t);
+          const g = Math.round(g1 + (g2 - g1) * t);
+          const b = Math.round(b1 + (b2 - b1) * t);
+
+          // Convert interpolated RGB back to hex string
+          // Use bitwise OR and shifting for efficient conversion, ensure 6 digits with padding
+          return `#${(1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).padStart(6, '0')}`;
+      }
+
+
+      /**
+       * Determines the appropriate terrain color based on the normalized noise value.
+       * Uses the defined color ranges (`this.r`) and palette (`this.c`).
+       * Interpolates between colors for smooth transitions.
+       * @param {number} noiseValue - The raw noise value (typically between -heightScale and +heightScale).
+       * @returns {string} A hex color string for the terrain tile.
+       */
+      getColor(noiseValue) {
+        // Normalize the noise value to the range [0, 1] for easier comparison with ranges
+        // Assumes noiseValue is roughly within [-1, 1] after height scaling applied in fractal()
+        // (Technically could exceed [-1, 1] slightly depending on heightScale, but clamping handles this)
+        const normalizedHeight = (noiseValue / this.p.heightScale + 1) / 2; // Map [-hs, hs] -> [0, 1]
+
+        const R = this.r; // Color ranges {d, sh, sa, g, f, ro, sn}
+        const C = this.c; // Color palette {deepWater, shallowWater, sand, ...}
+
+        // Determine color based on normalized height and ranges, interpolating between zones
+        if (normalizedHeight <= R.d) return C.deepWater; // Deepest water
+        if (normalizedHeight <= R.sh) return this.mix(C.deepWater, C.shallowWater, (normalizedHeight - R.d) / (R.sh - R.d)); // Deep to shallow water
+        if (normalizedHeight <= R.sa) return this.mix(C.shallowWater, C.sand, (normalizedHeight - R.sh) / (R.sa - R.sh)); // Shallow water to sand
+        if (normalizedHeight <= R.g) return this.mix(C.sand, C.grass, (normalizedHeight - R.sa) / (R.g - R.sa));     // Sand to grass
+        if (normalizedHeight <= R.f) return this.mix(C.grass, C.forest, (normalizedHeight - R.g) / (R.f - R.g));    // Grass to forest
+        if (normalizedHeight <= R.ro) return this.mix(C.forest, C.rock, (normalizedHeight - R.f) / (R.ro - R.f));    // Forest to rock
+        // Anything above the rock threshold blends towards snow
+        return this.mix(C.rock, C.snow, (normalizedHeight - R.ro) / (R.sn - R.ro)); // Rock to snow (R.sn is usually 1.0)
+      }
+
+      /**
+       * The main animation loop, called repeatedly by requestAnimationFrame.
+       * Handles time-based updates (like panning) and triggers rendering when needed.
+       * @param {DOMHighResTimeStamp} timestamp - The current time provided by requestAnimationFrame.
+       */
+      loop(timestamp) {
+        // Calculate delta time (time since last frame in seconds)
+        const deltaTime = this.lastT ? (timestamp - this.lastT) / 1000 : 0;
+        this.lastT = timestamp;
+
+        // Handle keyboard panning (time-based for smooth movement)
+        const panSpeed = 300 * deltaTime; // Pixels per second scaled by delta time
+        let moved = false;
+        if (this.keys['w'] || this.keys['arrowup']) { this.view.y -= panSpeed; moved = true; }
+        if (this.keys['s'] || this.keys['arrowdown']) { this.view.y += panSpeed; moved = true; }
+        if (this.keys['a'] || this.keys['arrowleft']) { this.view.x -= panSpeed; moved = true; }
+        if (this.keys['d'] || this.keys['arrowright']) { this.view.x += panSpeed; moved = true; }
+
+        // If movement occurred, flag for re-render
+        if (moved) this.need = true;
+
+        // Render the scene only if necessary (state changed or input occurred)
+        if (this.need) {
+          this.render();
+          this.need = false; // Reset the flag after rendering
+        }
+
+        // Request the next frame
+        requestAnimationFrame(ts => this.loop(ts));
+      }
+
+      /**
+       * Renders the terrain onto the canvas based on the current view and parameters.
+       */
+      render() {
+        const ctx = this.ctx;
+        const tileSize = this.p.tileSize;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // Clear the entire canvas (respecting DPR scaling)
+        ctx.clearRect(0, 0, screenWidth, screenHeight);
+
+        // Calculate the range of tiles needed to cover the screen
+        // Add a buffer of 1-2 tiles to avoid visual gaps during panning
+        const cols = Math.ceil(screenWidth / tileSize) + 2;
+        const rows = Math.ceil(screenHeight / tileSize) + 2;
+
+        // Calculate the drawing offset based on the fractional part of the view position
+        // This ensures smooth scrolling pixel by pixel, not just tile by tile
+        const offsetX = -(this.view.x % tileSize);
+        const offsetY = -(this.view.y % tileSize);
+
+        // Calculate the index of the top-left tile to start drawing from
+        const startTileX = Math.floor(this.view.x / tileSize);
+        const startTileY = Math.floor(this.view.y / tileSize);
+
+        // Loop through the visible grid of tiles
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            // Calculate the world coordinates for the center of the current tile
+            // Using tile center might give slightly better noise distribution but corner is fine too
+            const worldX = (startTileX + x) * tileSize; // + tileSize / 2;
+            const worldY = (startTileY + y) * tileSize; // + tileSize / 2;
+
+            // Get the fractal noise value for this world position
+            const noiseValue = this.fractal(worldX, worldY);
+
+            // Determine the fill style based on the rendering mode and noise value
+            if (this.p.mode === 'bw') {
+              // Black and white mode: map noise [-1, 1] to grayscale [0, 255]
+              const gray = Math.floor(((noiseValue / this.p.heightScale + 1) / 2) * 255);
+              ctx.fillStyle = `rgb(${gray},${gray},${gray})`;
+            } else {
+              // Color atlas mode: get color based on noise value and ranges
+              ctx.fillStyle = this.getColor(noiseValue);
+            }
+
+            // Calculate the screen position to draw this tile
+            const screenX = Math.floor(x * tileSize + offsetX);
+            const screenY = Math.floor(y * tileSize + offsetY);
+
+            // Draw the tile rectangle
+            if (this.p.showGrid && tileSize > 3) {
+              // Draw slightly smaller rectangle to leave grid lines
+              ctx.fillRect(screenX + 1, screenY + 1, tileSize - 1, tileSize - 1);
+            } else {
+              // Draw full tile (or when tiles are too small for grid)
+              // Using Math.ceil on size prevents 1px gaps between tiles on some zoom levels/DPR
+              ctx.fillRect(screenX, screenY, Math.ceil(tileSize), Math.ceil(tileSize));
+            }
+          }
+        }
+
+        // Update the coordinate display
+        const coordsElement = document.getElementById('coords');
+        if (coordsElement) {
+            coordsElement.textContent =
+            `X: ${Math.round(this.view.x)}, Y: ${Math.round(this.view.y)}`;
+        }
+      }
+    }
+
+    // Initialize the Terrain application once the page is fully loaded
+    window.addEventListener('load', () => {
+        window.terrainApp = new Terrain(); // Assign to window for potential debugging access
+    });
+  </script>
 </body>
 </html>
