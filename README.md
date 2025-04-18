@@ -1,6 +1,6 @@
 # Interactive 2D Terrain Generator
 
-This is a simple, interactive 2D terrain generator built with HTML, CSS, and JavaScript. It uses Perlin noise and Fractional Brownian Motion (FBM) to create tile-based terrain maps that can be explored and customized in real-time.
+This is a simple, interactive 2D terrain generator built with HTML, CSS, and JavaScript. It uses Perlin noise and Fractional Brownian Motion (FBM) to create tile-based terrain maps that can be explored and customized in real-time. Created in collaboration with AI tools and programming. Primarily [Gemini 2.5 Pro Preview](https://aistudio.google.com/) on this project.
 
 View App: [https://terraingen.netlify.app/](https://terraingen.netlify.app/)
 
